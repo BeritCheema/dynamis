@@ -28,6 +28,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/basketball" element={<BasketballTraining />} />
+            <Route path="/baseball" element={<BaseballTraining />} />
             <Route path="/training-prep" element={<TrainingPrep />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

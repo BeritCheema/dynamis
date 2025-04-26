@@ -15,10 +15,10 @@ const Dashboard = () => {
       path: "/basketball",
     },
     {
-      title: "Throwing",
-      description: "Master throwing mechanics across sports.",
+      title: "Baseball Pitching",
+      description: "Master your pitching mechanics with real-time analysis.",
       iconComponent: MessageSquare,
-      path: "/throwing",
+      path: "/baseball",
     },
   ];
 
