@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { NavigationBar } from "@/components/NavigationBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +10,7 @@ const BasketballTraining = () => {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const handleStartTraining = () => {
-    setShowSuccess(true);
-    // In a real app, this would start the camera and training session
-    setTimeout(() => {
-      setShowSuccess(false);
-    }, 3000);
+    navigate('/training-prep');
   };
 
   const handleTalkToCoach = () => {

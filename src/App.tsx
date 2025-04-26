@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/Dashboard";
 import BasketballTraining from "./pages/BasketballTraining";
+import TrainingPrep from "./pages/TrainingPrep";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/basketball" element={<BasketballTraining />} />
+            <Route path="/training-prep" element={<TrainingPrep />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
