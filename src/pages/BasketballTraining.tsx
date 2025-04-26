@@ -5,17 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import PoseDetectionCamera from "@/components/PoseDetectionCamera";
 
 const BasketballTraining = () => {
   const navigate = useNavigate();
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
 
   const handleStartTraining = () => {
-    setShowSuccess(true);
-    // In a real app, this would start the camera and training session
-    setTimeout(() => {
-      setShowSuccess(false);
-    }, 3000);
+    setShowCamera(true);
   };
 
   const handleTalkToCoach = () => {
@@ -39,49 +37,56 @@ const BasketballTraining = () => {
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card
-            className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
-            onClick={handleStartTraining}
-          >
-            <CardHeader className="flex flex-row items-center gap-4">
-              <Dumbbell className="w-8 h-8 text-orange-500" />
-              <CardTitle>Start Training</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                Turn on your camera and get real-time feedback on your shooting form.
-                Our AI will analyze your technique and provide instant corrections.
-              </p>
-              <Button 
-                className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
-              >
-                Start Now
-              </Button>
-            </CardContent>
-          </Card>
+        {showCamera ? (
+          <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 className="text-xl font-bold mb-4">Pose Detection</h2>
+            <PoseDetectionCamera onClose={() => setShowCamera(false)} />
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
+              onClick={handleStartTraining}
+            >
+              <CardHeader className="flex flex-row items-center gap-4">
+                <Dumbbell className="w-8 h-8 text-orange-500" />
+                <CardTitle>Start Training</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Turn on your camera and get real-time feedback on your shooting form.
+                  Our AI will analyze your technique and provide instant corrections.
+                </p>
+                <Button 
+                  className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
+                >
+                  Start Now
+                </Button>
+              </CardContent>
+            </Card>
 
-          <Card
-            className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
-            onClick={handleTalkToCoach}
-          >
-            <CardHeader className="flex flex-row items-center gap-4">
-              <MessageSquare className="w-8 h-8 text-orange-500" />
-              <CardTitle>Talk to Coach</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                Have questions about your technique? Want personalized advice?
-                Chat with our AI coach to get customized basketball shooting tips.
-              </p>
-              <Button 
-                className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
-              >
-                Start Chat
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
+              onClick={handleTalkToCoach}
+            >
+              <CardHeader className="flex flex-row items-center gap-4">
+                <MessageSquare className="w-8 h-8 text-orange-500" />
+                <CardTitle>Talk to Coach</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Have questions about your technique? Want personalized advice?
+                  Chat with our AI coach to get customized basketball shooting tips.
+                </p>
+                <Button 
+                  className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
+                >
+                  Start Chat
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <Button 
           onClick={() => navigate('/dashboard')}
