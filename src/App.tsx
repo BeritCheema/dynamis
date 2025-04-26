@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/Dashboard";
 import BasketballTraining from "./pages/BasketballTraining";
+import BaseballTraining from "./pages/BaseballTraining";
 import TrainingPrep from "./pages/TrainingPrep";
 
 const queryClient = new QueryClient();
