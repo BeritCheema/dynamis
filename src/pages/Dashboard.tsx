@@ -1,7 +1,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Basketball, Baseball } from "lucide-react";
+import { Activity, Dumbbell } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -10,13 +10,13 @@ const Dashboard = () => {
     {
       title: "Basketball Shooting",
       description: "Learn proper shooting form with live feedback.",
-      iconComponent: Basketball,
+      iconComponent: Activity,
       path: "/basketball",
     },
     {
       title: "Throwing",
       description: "Master throwing mechanics across sports.",
-      iconComponent: Baseball,
+      iconComponent: Dumbbell,
       path: "/throwing",
     },
   ];
