@@ -1,10 +1,22 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 
-export function useAuth() {
+// Create context for auth
+type AuthContextType = {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Provider component
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,11 +57,18 @@ export function useAuth() {
     navigate('/login');
   };
 
-  return {
-    user,
-    session,
-    loading,
-    signIn,
-    signOut,
-  };
+  return (
+    <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Custom hook that uses the context
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
