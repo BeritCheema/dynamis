@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { NavigationBar } from "@/components/NavigationBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,7 @@ const BaseballTraining = () => {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const handleStartTraining = () => {
-    navigate('/training-prep');
+    navigate('/pitching');
   };
 
   const handleTalkToCoach = () => {

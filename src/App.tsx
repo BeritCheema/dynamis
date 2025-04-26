@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import BasketballTraining from "./pages/BasketballTraining";
 import BaseballTraining from "./pages/BaseballTraining";
 import TrainingPrep from "./pages/TrainingPrep";
+import PitchingTraining from "./pages/PitchingTraining";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +31,7 @@ const App = () => (
             <Route path="/basketball" element={<BasketballTraining />} />
             <Route path="/baseball" element={<BaseballTraining />} />
             <Route path="/training-prep" element={<TrainingPrep />} />
+            <Route path="/pitching" element={<PitchingTraining />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
