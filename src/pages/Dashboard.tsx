@@ -1,7 +1,8 @@
 
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Basketball, Baseball } from "lucide-react";
+import { Icon } from "lucide-react";
+import dynamicIconImports from "lucide-react/dynamicIconImports";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -10,13 +11,13 @@ const Dashboard = () => {
     {
       title: "Basketball Shooting",
       description: "Learn proper shooting form with live feedback.",
-      icon: Basketball,
+      icon: dynamicIconImports["basketball"],
       path: "/basketball",
     },
     {
       title: "Throwing",
       description: "Master throwing mechanics across sports.",
-      icon: Baseball,
+      icon: dynamicIconImports["baseball"],
       path: "/throwing",
     },
   ];
@@ -32,7 +33,7 @@ const Dashboard = () => {
             onClick={() => navigate(module.path)}
           >
             <CardHeader className="flex flex-row items-center gap-4">
-              <module.icon className="w-8 h-8 text-orange-500" />
+              <Icon name={module.title === "Basketball Shooting" ? "basketball" : "baseball"} className="w-8 h-8 text-orange-500" />
               <CardTitle>{module.title}</CardTitle>
             </CardHeader>
             <CardContent>
