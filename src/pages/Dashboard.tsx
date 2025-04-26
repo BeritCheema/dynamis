@@ -1,6 +1,7 @@
+
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Dumbbell } from "lucide-react";
+import { Activity, MessageSquare } from "lucide-react";
 import { NavigationBar } from "@/components/NavigationBar";
 
 const Dashboard = () => {
@@ -16,7 +17,7 @@ const Dashboard = () => {
     {
       title: "Throwing",
       description: "Master throwing mechanics across sports.",
-      iconComponent: Dumbbell,
+      iconComponent: MessageSquare,
       path: "/throwing",
     },
   ];
