@@ -13,24 +13,30 @@ const PoseDetectionCamera: React.FC<PoseDetectionCameraProps> = ({ onClose }) =>
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [model, setModel] = useState<poseDetection.PoseDetector | null>(null);
+  const [loadingModel, setLoadingModel] = useState<boolean>(false);
+  const [modelLoadError, setModelLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     // Initialize TensorFlow.js
     const setupTf = async () => {
-      await tf.ready();
-      const detectorConfig = {
-        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-      };
-      
+      setLoadingModel(true);
       try {
+        await tf.ready();
+        const detectorConfig = {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+        };
+        
         const detector = await poseDetection.createDetector(
           poseDetection.SupportedModels.MoveNet,
           detectorConfig
         );
         setModel(detector);
+        setLoadingModel(false);
         console.log('Pose model loaded successfully');
       } catch (error) {
         console.error('Failed to load pose model:', error);
+        setModelLoadError('Failed to load pose detection model. Please try refreshing the page.');
+        setLoadingModel(false);
       }
     };
 
@@ -169,6 +175,10 @@ const PoseDetectionCamera: React.FC<PoseDetectionCameraProps> = ({ onClose }) =>
   };
 
   const handleStartDetecting = () => {
+    if (!model) {
+      setModelLoadError('Model is not loaded yet. Please wait or refresh the page.');
+      return;
+    }
     setIsDetecting(true);
   };
 
@@ -191,15 +201,25 @@ const PoseDetectionCamera: React.FC<PoseDetectionCameraProps> = ({ onClose }) =>
         />
         {!isDetecting && (
           <div className="bg-gray-100 p-12 flex flex-col items-center justify-center">
-            <p className="text-gray-600 mb-4">Click Start to enable the camera and begin pose detection</p>
+            {loadingModel ? (
+              <p className="text-gray-600 mb-4">Loading pose detection model...</p>
+            ) : modelLoadError ? (
+              <p className="text-red-600 mb-4">{modelLoadError}</p>
+            ) : (
+              <p className="text-gray-600 mb-4">Click Start to enable the camera and begin pose detection</p>
+            )}
           </div>
         )}
       </div>
 
       <div className="flex space-x-4">
         {!isDetecting ? (
-          <Button onClick={handleStartDetecting} className="bg-orange-500 hover:bg-orange-600">
-            Start Camera
+          <Button 
+            onClick={handleStartDetecting} 
+            className="bg-orange-500 hover:bg-orange-600"
+            disabled={loadingModel || !!modelLoadError}
+          >
+            {loadingModel ? "Loading..." : "Start Camera"}
           </Button>
         ) : (
           <Button onClick={handleStopDetecting} className="bg-red-500 hover:bg-red-600">
