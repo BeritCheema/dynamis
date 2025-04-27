@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Info, Flag, Mail, Dumbbell } from "lucide-react";
@@ -21,7 +20,7 @@ export const NavigationBar = ({ variant }: NavigationBarProps) => {
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2 text-2xl font-bold text-orange-500">
               <Dumbbell className="w-8 h-8" />
-              Motion Coach
+              Dynamis
             </Link>
             <div className="hidden md:flex space-x-4">
               {landingLinks.map((link) => {
@@ -56,7 +55,7 @@ export const NavigationBar = ({ variant }: NavigationBarProps) => {
           <div className="flex items-center gap-2">
             <Dumbbell className="w-8 h-8 text-orange-500" />
             <Link to="/dashboard" className="text-2xl font-bold text-orange-500">
-              Motion Coach
+              Dynamis
             </Link>
           </div>
           <div className="flex items-center space-x-4">

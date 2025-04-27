@@ -1,4 +1,5 @@
-# Welcome to your Lovable project
+
+# Welcome to your Dynamis project
 
 ## Project info
 
@@ -52,7 +53,7 @@ npm run dev
 
 ## What technologies are used for this project?
 
-This project is built with:
+Dynamis is built with:
 
 - Vite
 - TypeScript
@@ -64,7 +65,7 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/1eb285c7-2160-4afd-b705-8f07b5927e79) and click on Share -> Publish.
 
-## Can I connect a custom domain to my Lovable project?
+## Can I connect a custom domain to my Dynamis project?
 
 Yes, you can!
 
