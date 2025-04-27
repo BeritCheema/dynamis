@@ -1,74 +1,103 @@
+# Dynamis
 
-# Welcome to your Dynamis project
+> **Unlock your athletic potential through AI-powered motion analysis and intelligent feedback.**
 
-## Project info
+---
 
-**URL**: https://lovable.dev/projects/1eb285c7-2160-4afd-b705-8f07b5927e79
+## Overview
 
-## How can I edit this code?
+**Dynamis** is a real-time sports training platform that captures an athlete's movement, analyzes key biomechanical features, and delivers AI-generated coaching feedback to optimize performance, form, and injury prevention.
 
-There are several ways of editing your application.
+Leveraging computer vision, real-time data processing, and large language models (LLMs), Dynamis helps athletes train smarter — unlocking the full power of their motion.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/1eb285c7-2160-4afd-b705-8f07b5927e79) and start prompting.
+## Key Features
 
-Changes made via Lovable will be committed automatically to this repo.
+- 📷 **Real-Time Pose Tracking** — Capture body landmarks using a standard camera.
+- 📊 **Movement Feature Extraction** — Analyze joint angles, stability, and motion dynamics.
+- 🧠 **AI Feedback Generation** — Use LLMs to interpret performance and recommend improvements.
+- 🔊 **Dynamic Speech Coaching** — Deliver coaching advice through AI-generated audio.
+- ⚡ **Multi-Sport Flexibility** — Built to adapt across different sports and training activities.
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Technology Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+| Frontend | Backend | AI / Data Processing |
+|:---|:---|:---|
+| React (Vite) | FastAPI (Python) | Google Gemini (LLM) |
+| Tailwind CSS | Uvicorn | OpenAI TTS (Text-to-Speech) |
+| Mediapipe Pose | Python-dotenv | Motion Feature Engineering |
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Architecture
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- **Frontend (Vite + React):**
+  - Captures video stream and extracts body pose landmarks.
+  - Sends batches of movement frames to backend for analysis.
+  - Plays AI-generated audio feedback to the user.
 
-# Step 3: Install the necessary dependencies.
-npm i
+- **Backend (FastAPI):**
+  - Processes real-time pose data and extracts key athletic features.
+  - Summarizes movement metrics (e.g., elbow extension, wrist snap, hip stability).
+  - Sends feature summaries to LLM for evaluation.
+  - Returns a coaching feedback message to frontend.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+- **AI Layer:**
+  - Google Gemini interprets biomechanical summaries.
+  - OpenAI TTS converts feedback into dynamic spoken advice.
+
+---
+
+## Setup Instructions
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/beritcheema/dynamis.git
+cd dynamis
+```
+
+---
+
+### 2. Backend Setup
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Create a `.env` file inside `/backend/`:
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key
+OPENAI_API_KEY=your_openai_tts_api_key
+```
+
+Start the backend server:
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+---
+
+### 3. Frontend Setup
+
+```bash
+cd ../
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Frontend will be available at `http://localhost:5173`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+# Dynamis
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-Dynamis is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/1eb285c7-2160-4afd-b705-8f07b5927e79) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Dynamis project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+**Train Smarter. Move Better. Unlock Your Potential.**
