@@ -1,1 +1,5 @@
+
 project_id = "dhtfcupsnfmidligzjmf"
+
+[functions.realtime-chat-token]
+verify_jwt = false
