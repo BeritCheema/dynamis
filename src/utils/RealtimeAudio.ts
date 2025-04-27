@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export class AudioRecorder {
@@ -13,14 +12,17 @@ export class AudioRecorder {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          sampleRate: 16000, // Gemini requires 16kHz for input
+          channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
         }
       });
       
-      // Create audio context without enforcing a specific sample rate
-      this.audioContext = new AudioContext();
+      this.audioContext = new AudioContext({
+        sampleRate: 16000, // Match Gemini's required input sample rate
+      });
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
@@ -59,10 +61,10 @@ export class AudioRecorder {
 }
 
 export class RealtimeChat {
-  private pc: RTCPeerConnection | null = null;
-  private dc: RTCDataChannel | null = null;
+  private ws: WebSocket | null = null;
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
+  private sessionHandle: string | null = null;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
@@ -71,64 +73,44 @@ export class RealtimeChat {
 
   async init() {
     try {
-      // Get ephemeral token from our Supabase Edge Function
-      const response = await supabase.functions.invoke('realtime-chat-token');
-      const data = await response.data;
+      const tokenResponse = await supabase.functions.invoke("realtime-chat-token");
+      const data = await tokenResponse.data;
       
-      if (!data?.client_secret?.value) {
-        throw new Error("Failed to get ephemeral token");
+      if (!data?.sessionHandle) {
+        throw new Error("Failed to get session handle");
       }
 
-      const EPHEMERAL_KEY = data.client_secret.value;
+      this.sessionHandle = data.sessionHandle;
 
-      // Create peer connection
-      this.pc = new RTCPeerConnection();
-
-      // Set up remote audio
-      this.pc.ontrack = e => this.audioEl.srcObject = e.streams[0];
-
-      // Add local audio track
-      const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.pc.addTrack(ms.getTracks()[0]);
-
-      // Set up data channel
-      this.dc = this.pc.createDataChannel("oai-events");
-      this.dc.addEventListener("message", (e) => {
-        const event = JSON.parse(e.data);
-        console.log("Received event:", event);
-        this.onMessage(event);
-      });
-
-      // Create and set local description
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
-
-      // Connect to OpenAI's Realtime API
-      const baseUrl = "https://api.openai.com/v1/realtime";
-      const model = "gpt-4o-realtime-preview-2024-12-17";
-      const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${EPHEMERAL_KEY}`,
-          "Content-Type": "application/sdp"
-        },
-      });
-
-      const answer = {
-        type: "answer" as RTCSdpType,
-        sdp: await sdpResponse.text(),
-      };
+      // Create WebSocket connection to Gemini
+      this.ws = new WebSocket(`wss://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-live-001:streamGenerateContent`);
       
-      await this.pc.setRemoteDescription(answer);
-      console.log("WebRTC connection established");
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("Received event:", data);
+        this.onMessage(data);
+
+        if (data.audioContent) {
+          // Convert base64 to audio buffer and play
+          const audioData = atob(data.audioContent);
+          const arrayBuffer = new ArrayBuffer(audioData.length);
+          const view = new Uint8Array(arrayBuffer);
+          for (let i = 0; i < audioData.length; i++) {
+            view[i] = audioData.charCodeAt(i);
+          }
+          
+          const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+          this.audioEl.src = URL.createObjectURL(blob);
+        }
+      };
 
       // Start recording
       this.recorder = new AudioRecorder((audioData) => {
-        if (this.dc?.readyState === 'open') {
-          this.dc.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: this.encodeAudioData(audioData)
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({
+            input_audio: {
+              content: this.encodeAudioData(audioData)
+            }
           }));
         }
       });
@@ -159,32 +141,11 @@ export class RealtimeChat {
     return btoa(binary);
   }
 
-  async sendMessage(text: string) {
-    if (!this.dc || this.dc.readyState !== 'open') {
-      throw new Error('Data channel not ready');
-    }
-
-    const event = {
-      type: 'conversation.item.create',
-      item: {
-        type: 'message',
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text
-          }
-        ]
-      }
-    };
-
-    this.dc.send(JSON.stringify(event));
-    this.dc.send(JSON.stringify({type: 'response.create'}));
-  }
-
   disconnect() {
     this.recorder?.stop();
-    this.dc?.close();
-    this.pc?.close();
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 }

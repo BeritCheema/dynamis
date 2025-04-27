@@ -14,22 +14,36 @@ serve(async (req) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not set');
+    const GEMENI_API_KEY = Deno.env.get('GEMENI_API_KEY');
+    if (!GEMENI_API_KEY) {
+      throw new Error('GEMENI_API_KEY is not set');
     }
 
-    // Request an ephemeral token from OpenAI
-    const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
+    // Create a session with Gemini
+    const response = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-live-001:streamGenerateContent", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "x-goog-api-key": GEMENI_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-realtime-preview-2024-12-17",
-        voice: "alloy",
-        instructions: "You are a knowledgeable baseball pitching coach. You help players improve their pitching technique, provide advice on different pitches, and answer questions about baseball pitching mechanics. Keep your responses focused, practical, and encouraging. If asked about an injury, always recommend consulting a medical professional."
+        config: {
+          response_modalities: ["AUDIO"],
+          speech_config: {
+            voice_config: {
+              prebuilt_voice_config: {
+                voice_name: "Puck"
+              }
+            }
+          },
+          system_instruction: {
+            content: {
+              parts: [{
+                text: "You are a knowledgeable baseball pitching coach. You help players improve their pitching technique, provide advice on different pitches, and answer questions about baseball pitching mechanics. Keep your responses focused, practical, and encouraging. If asked about an injury, always recommend consulting a medical professional."
+              }]
+            }
+          }
+        }
       }),
     });
 
@@ -47,3 +61,4 @@ serve(async (req) => {
     });
   }
 });
+
