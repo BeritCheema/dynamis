@@ -36,6 +36,7 @@ const TrainingPrep = () => {
   const THROW_DURATION = 1 * 1000; // milliseconds
   const REST_DURATION = 5 * 1000;  // milliseconds
 
+  // --- Period Control ---
   const startPeriodLoop = () => {
     isThrowPeriodRef.current = false;
     setIsThrowPeriod(false);
@@ -131,14 +132,15 @@ const TrainingPrep = () => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
 
-          const maxChunks = Math.ceil(15000 / 1000);
+          // Keep only roughly last 15 seconds of audio chunks
+          const maxChunks = Math.ceil(15000 / 1000); // assuming ~1 chunk per second
           if (audioChunksRef.current.length > maxChunks) {
             audioChunksRef.current.shift();
           }
         }
       };
 
-      mediaRecorder.start(1000);
+      mediaRecorder.start(1000); // capture every 1 second
       mediaRecorderRef.current = mediaRecorder;
       console.log("Microphone recording started.");
     } catch (error) {
@@ -168,7 +170,6 @@ const TrainingPrep = () => {
     };
     reader.readAsDataURL(audioBlob);
   };
-
   const onResults = (results: Results) => {
     if (results.poseLandmarks && canvasRef.current && videoRef.current) {
       latestLandmarks.current = results.poseLandmarks;
@@ -204,18 +205,21 @@ const TrainingPrep = () => {
       });
     }
   };
-
   const generateSpeech = async (text: string) => {
     try {
-      const response = await fetch('https://dhtfcupsnfmidligzjmf.supabase.co/functions/v1/realtime-chat-token', {
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text,
+          model: "gpt-4o-mini-tts",
           voice: "nova",
+          input: text,
           speed: 2.0,
+          response_format: "mp3",
+          instructions: "Be seductive, flirty and sexy."
         }),
       });
 
@@ -233,13 +237,12 @@ const TrainingPrep = () => {
 
       console.log("Speech played. Waiting 20 seconds...");
 
-      await new Promise((resolve) => setTimeout(resolve, 20000));
+      await new Promise((resolve) => setTimeout(resolve, 20000)); // <-- 20 second wait after playing
       console.log("Ready for next speech.");
     } catch (error) {
       console.error("Failed to generate speech:", error);
     }
   };
-
   const connectWebSocket = () => {
     const ws = new WebSocket("ws://localhost:8000/baseball");
     ws.onopen = () => console.log("WebSocket connection opened.");
@@ -249,7 +252,7 @@ const TrainingPrep = () => {
         console.log("Received from server:", data);
         if (data.Text) {
           setWaitingForFeedback(true);
-          generateSpeech(data.Text);
+          generateSpeech(data.Text); // Uncomment if needed
           setWaitingForFeedback(false);
         }
       } catch (e) {
