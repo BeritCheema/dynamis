@@ -14,22 +14,29 @@ serve(async (req) => {
   }
 
   try {
-    const GEMENI_API_KEY = Deno.env.get('GEMENI_API_KEY');
-    if (!GEMENI_API_KEY) {
-      throw new Error('GEMENI_API_KEY is not set');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // Use a valid model name for Gemini
-    const modelName = "gemini-1.5-flash-latest";
-    
-    // We don't actually need to make an initial request here,
-    // we just need to provide the API key and model name to the client
-    const sessionData = {
-      sessionHandle: GEMENI_API_KEY,
-      modelName: modelName
-    };
+    // Request an ephemeral token from OpenAI
+    const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-realtime-preview-2024-12-17",
+        voice: "alloy",
+        instructions: "You are a knowledgeable baseball pitching coach. You help players improve their pitching technique, provide advice on different pitches, and answer questions about baseball pitching mechanics. Keep your responses focused, practical, and encouraging. If asked about an injury, always recommend consulting a medical professional."
+      }),
+    });
 
-    return new Response(JSON.stringify(sessionData), {
+    const data = await response.json();
+    console.log("Session created:", data);
+
+    return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

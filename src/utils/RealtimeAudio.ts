@@ -11,23 +11,16 @@ export class AudioRecorder {
 
   async start() {
     try {
-      // Request user microphone at 16kHz to match Gemini's requirements
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
-          channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
         }
       });
       
-      // Create AudioContext with the SAME sample rate as the requested stream
+      // Create audio context without enforcing a specific sample rate
       this.audioContext = new AudioContext();
-      
-      // Get the actual sample rate from the AudioContext
-      const actualSampleRate = this.audioContext.sampleRate;
-      console.log(`Actual AudioContext sample rate: ${actualSampleRate}Hz`);
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
@@ -66,11 +59,10 @@ export class AudioRecorder {
 }
 
 export class RealtimeChat {
-  private ws: WebSocket | null = null;
+  private pc: RTCPeerConnection | null = null;
+  private dc: RTCDataChannel | null = null;
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
-  private apiKey: string | null = null;
-  private isFirstMessage = true;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
@@ -79,84 +71,67 @@ export class RealtimeChat {
 
   async init() {
     try {
-      // Get the API key from our edge function
-      const tokenResponse = await supabase.functions.invoke("realtime-chat-token");
-      const data = tokenResponse.data;
+      // Get ephemeral token from our Supabase Edge Function
+      const response = await supabase.functions.invoke('realtime-chat-token');
+      const data = await response.data;
       
-      if (!data?.sessionHandle) {
-        throw new Error("Failed to get session handle");
+      if (!data?.client_secret?.value) {
+        throw new Error("Failed to get ephemeral token");
       }
 
-      this.apiKey = data.sessionHandle;
-      const modelName = data.modelName || "gemini-1.5-flash-latest";
+      const EPHEMERAL_KEY = data.client_secret.value;
 
-      // Create WebSocket connection to Gemini with the API key
-      const wsUrl = `wss://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${this.apiKey}`;
-      this.ws = new WebSocket(wsUrl);
-      
-      // Set up WebSocket handlers
-      this.ws.onopen = () => {
-        console.log("WebSocket connection established");
-        // Send initial configuration
-        this.sendInitialConfig();
+      // Create peer connection
+      this.pc = new RTCPeerConnection();
+
+      // Set up remote audio
+      this.pc.ontrack = e => this.audioEl.srcObject = e.streams[0];
+
+      // Add local audio track
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.pc.addTrack(ms.getTracks()[0]);
+
+      // Set up data channel
+      this.dc = this.pc.createDataChannel("oai-events");
+      this.dc.addEventListener("message", (e) => {
+        const event = JSON.parse(e.data);
+        console.log("Received event:", event);
+        this.onMessage(event);
+      });
+
+      // Create and set local description
+      const offer = await this.pc.createOffer();
+      await this.pc.setLocalDescription(offer);
+
+      // Connect to OpenAI's Realtime API
+      const baseUrl = "https://api.openai.com/v1/realtime";
+      const model = "gpt-4o-realtime-preview-2024-12-17";
+      const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+        method: "POST",
+        body: offer.sdp,
+        headers: {
+          Authorization: `Bearer ${EPHEMERAL_KEY}`,
+          "Content-Type": "application/sdp"
+        },
+      });
+
+      const answer = {
+        type: "answer" as RTCSdpType,
+        sdp: await sdpResponse.text(),
       };
       
-      this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log("Received event:", data);
-        this.onMessage(data);
-
-        // Handle audio responses
-        if (data.candidates && data.candidates[0] && data.candidates[0].content && 
-            data.candidates[0].content.parts && data.candidates[0].content.parts[0] && 
-            data.candidates[0].content.parts[0].audio_data) {
-          
-          const audioData = data.candidates[0].content.parts[0].audio_data;
-          const audioBytes = atob(audioData);
-          
-          // Convert base64 to audio buffer
-          const arrayBuffer = new ArrayBuffer(audioBytes.length);
-          const view = new Uint8Array(arrayBuffer);
-          for (let i = 0; i < audioBytes.length; i++) {
-            view[i] = audioBytes.charCodeAt(i);
-          }
-          
-          const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
-          this.audioEl.src = URL.createObjectURL(blob);
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-      };
-
-      this.ws.onclose = (event) => {
-        console.log("WebSocket closed:", event);
-      };
+      await this.pc.setRemoteDescription(answer);
+      console.log("WebRTC connection established");
 
       // Start recording
       this.recorder = new AudioRecorder((audioData) => {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-          // Convert audio format for Gemini (Float32Array to base64)
-          const base64Audio = this.encodeAudioData(audioData);
-          
-          if (this.isFirstMessage) {
-            // For the first message, we send both the text prompt and audio data
-            this.isFirstMessage = false;
-          } else {
-            // For subsequent messages, we only send the audio data
-            this.ws.send(JSON.stringify({
-              "contents": [{
-                "role": "user",
-                "parts": [{
-                  "audio_data": base64Audio
-                }]
-              }]
-            }));
-          }
+        if (this.dc?.readyState === 'open') {
+          this.dc.send(JSON.stringify({
+            type: 'input_audio_buffer.append',
+            audio: this.encodeAudioData(audioData)
+          }));
         }
       });
-      
       await this.recorder.start();
 
     } catch (error) {
@@ -164,44 +139,14 @@ export class RealtimeChat {
       throw error;
     }
   }
-  
-  private sendInitialConfig() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    
-    this.ws.send(JSON.stringify({
-      "contents": [{
-        "role": "user",
-        "parts": [{
-          "text": "Hello, I'm ready to talk about baseball pitching."
-        }]
-      }],
-      "generation_config": {
-        "response_modalities": ["AUDIO"],
-        "speech_config": {
-          "voice_config": {
-            "prebuilt_voice_config": {
-              "voice_name": "Puck"
-            }
-          }
-        }
-      },
-      "system_instruction": {
-        "parts": [{
-          "text": "You are a knowledgeable baseball pitching coach. You help players improve their pitching technique, provide advice on different pitches, and answer questions about baseball pitching mechanics. Keep your responses focused, practical, and encouraging. If asked about an injury, always recommend consulting a medical professional."
-        }]
-      }
-    }));
-  }
 
   private encodeAudioData(float32Array: Float32Array): string {
-    // Convert Float32 to Int16 (required by Gemini)
     const int16Array = new Int16Array(float32Array.length);
     for (let i = 0; i < float32Array.length; i++) {
       const s = Math.max(-1, Math.min(1, float32Array[i]));
       int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     
-    // Convert to base64
     const uint8Array = new Uint8Array(int16Array.buffer);
     let binary = '';
     const chunkSize = 0x8000;
@@ -214,11 +159,32 @@ export class RealtimeChat {
     return btoa(binary);
   }
 
+  async sendMessage(text: string) {
+    if (!this.dc || this.dc.readyState !== 'open') {
+      throw new Error('Data channel not ready');
+    }
+
+    const event = {
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text
+          }
+        ]
+      }
+    };
+
+    this.dc.send(JSON.stringify(event));
+    this.dc.send(JSON.stringify({type: 'response.create'}));
+  }
+
   disconnect() {
     this.recorder?.stop();
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.dc?.close();
+    this.pc?.close();
   }
 }
