@@ -14,6 +14,7 @@ import BaseballTraining from "./pages/BaseballTraining";
 import TrainingPrep from "./pages/TrainingPrep";
 import PitchingTraining from "./pages/PitchingTraining";
 import PitchingLearning from "./pages/PitchingLearning";
+import BaseballCoach from "./pages/BaseballCoach";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/training-prep" element={<TrainingPrep />} />
             <Route path="/pitching" element={<PitchingTraining />} />
             <Route path="/pitching/learn" element={<PitchingLearning />} />
+            <Route path="/baseball/coach" element={<BaseballCoach />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

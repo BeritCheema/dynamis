@@ -4,19 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, MessageSquare, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import VoiceInterface from "@/components/VoiceInterface";
 
 const BaseballTraining = () => {
   const navigate = useNavigate();
-  const [showVoiceInterface, setShowVoiceInterface] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const handleStartTraining = () => {
     navigate('/pitching');
   };
 
   const handleTalkToCoach = () => {
-    setShowVoiceInterface(true);
+    navigate('/baseball/coach');
   };
 
   return (
@@ -69,11 +66,11 @@ const BaseballTraining = () => {
           </Card>
 
           <Card
-            className={`cursor-pointer hover:shadow-lg transition-shadow hover:scale-105 ${showVoiceInterface ? 'border-primary' : ''}`}
+            className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
             onClick={handleTalkToCoach}
           >
             <CardHeader className="flex flex-row items-center gap-4">
-              <MessageSquare className={`w-8 h-8 ${isSpeaking ? 'text-primary animate-pulse' : 'text-orange-500'}`} />
+              <MessageSquare className="w-8 h-8 text-orange-500" />
               <CardTitle>Talk to Coach</CardTitle>
             </CardHeader>
             <CardContent>
@@ -84,7 +81,7 @@ const BaseballTraining = () => {
               <Button 
                 className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
               >
-                {showVoiceInterface ? 'Chatting with Coach' : 'Start Chat'}
+                Start Chat
               </Button>
             </CardContent>
           </Card>
@@ -97,10 +94,6 @@ const BaseballTraining = () => {
         >
           Back to Dashboard
         </Button>
-
-        {showVoiceInterface && (
-          <VoiceInterface onSpeakingChange={setIsSpeaking} />
-        )}
       </div>
     </>
   );
