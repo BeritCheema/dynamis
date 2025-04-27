@@ -5,14 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, MessageSquare, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { CoachConversationDialog } from "@/components/CoachConversation";
 
 const BaseballTraining = () => {
   const navigate = useNavigate();
-  const [showCoachDialog, setShowCoachDialog] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleStartTraining = () => {
     navigate('/pitching');
+  };
+
+  const handleTalkToCoach = () => {
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+    }, 3000);
   };
 
   return (
@@ -21,6 +27,13 @@ const BaseballTraining = () => {
       <div className="container mx-auto px-4 py-8 pt-20">
         <h1 className="text-3xl font-bold text-center mb-8">Baseball Pitching Training</h1>
         
+        {showSuccess && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6 animate-fade-in">
+            <strong className="font-bold">Success!</strong>
+            <span className="block sm:inline"> Feature would be implemented in a real app.</span>
+          </div>
+        )}
+
         <div className="grid md:grid-cols-3 gap-6">
           <Card
             className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
@@ -66,7 +79,7 @@ const BaseballTraining = () => {
 
           <Card
             className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
-            onClick={() => setShowCoachDialog(true)}
+            onClick={handleTalkToCoach}
           >
             <CardHeader className="flex flex-row items-center gap-4">
               <MessageSquare className="w-8 h-8 text-orange-500" />
@@ -94,11 +107,6 @@ const BaseballTraining = () => {
           Back to Dashboard
         </Button>
       </div>
-      
-      <CoachConversationDialog 
-        open={showCoachDialog}
-        onOpenChange={setShowCoachDialog}
-      />
     </>
   );
 };
