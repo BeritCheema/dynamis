@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { NavigationBar } from "@/components/NavigationBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, MessageSquare } from "lucide-react";
+import { Dumbbell, MessageSquare, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const BaseballTraining = () => {
@@ -33,7 +34,7 @@ const BaseballTraining = () => {
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           <Card
             className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
             onClick={handleStartTraining}
@@ -51,6 +52,27 @@ const BaseballTraining = () => {
                 className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
               >
                 Start Now
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
+            onClick={() => navigate('/pitching/learn')}
+          >
+            <CardHeader className="flex flex-row items-center gap-4">
+              <BookOpen className="w-8 h-8 text-orange-500" />
+              <CardTitle>Learn Pitching</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600">
+                Learn the fundamentals of pitching, including proper grip,
+                stance, and mechanics for throwing the perfect pitch.
+              </p>
+              <Button 
+                className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
+              >
+                Start Learning
               </Button>
             </CardContent>
           </Card>
