@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export class AudioRecorder {
@@ -64,7 +65,7 @@ export class RealtimeChat {
   private ws: WebSocket | null = null;
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
-  private sessionHandle: string | null = null;
+  private apiKey: string | null = null;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
@@ -73,30 +74,63 @@ export class RealtimeChat {
 
   async init() {
     try {
+      // Get the API key from our edge function
       const tokenResponse = await supabase.functions.invoke("realtime-chat-token");
-      const data = await tokenResponse.data;
+      const data = tokenResponse.data;
       
       if (!data?.sessionHandle) {
         throw new Error("Failed to get session handle");
       }
 
-      this.sessionHandle = data.sessionHandle;
+      this.apiKey = data.sessionHandle;
+      const modelName = data.modelName || "gemini-2.0-flash-live-001";
 
-      // Create WebSocket connection to Gemini
-      this.ws = new WebSocket(`wss://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-live-001:streamGenerateContent`);
+      // Create WebSocket connection to Gemini with the API key
+      const wsUrl = `wss://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${this.apiKey}`;
+      this.ws = new WebSocket(wsUrl);
+      
+      // Set up WebSocket handlers
+      this.ws.onopen = () => {
+        console.log("WebSocket connection established");
+        // Send initial configuration
+        this.ws.send(JSON.stringify({
+          "contents": [{
+            "role": "user",
+            "parts": [{
+              "text": "Hello, I'm ready to talk about baseball pitching."
+            }]
+          }],
+          "generation_config": {
+            "response_modalities": ["AUDIO"],
+            "speech_config": {
+              "voice_config": {
+                "prebuilt_voice_config": {
+                  "voice_name": "Puck"
+                }
+              }
+            }
+          }
+        }));
+      };
       
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         console.log("Received event:", data);
         this.onMessage(data);
 
-        if (data.audioContent) {
-          // Convert base64 to audio buffer and play
-          const audioData = atob(data.audioContent);
-          const arrayBuffer = new ArrayBuffer(audioData.length);
+        // Handle audio responses
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && 
+            data.candidates[0].content.parts && data.candidates[0].content.parts[0] && 
+            data.candidates[0].content.parts[0].audio_data) {
+          
+          const audioData = data.candidates[0].content.parts[0].audio_data;
+          const audioBytes = atob(audioData);
+          
+          // Convert base64 to audio buffer
+          const arrayBuffer = new ArrayBuffer(audioBytes.length);
           const view = new Uint8Array(arrayBuffer);
-          for (let i = 0; i < audioData.length; i++) {
-            view[i] = audioData.charCodeAt(i);
+          for (let i = 0; i < audioBytes.length; i++) {
+            view[i] = audioBytes.charCodeAt(i);
           }
           
           const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
@@ -104,16 +138,31 @@ export class RealtimeChat {
         }
       };
 
+      this.ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+
+      this.ws.onclose = (event) => {
+        console.log("WebSocket closed:", event);
+      };
+
       // Start recording
       this.recorder = new AudioRecorder((audioData) => {
         if (this.ws?.readyState === WebSocket.OPEN) {
+          // Convert audio format for Gemini (Float32Array to base64)
+          const base64Audio = this.encodeAudioData(audioData);
+          
           this.ws.send(JSON.stringify({
-            input_audio: {
-              content: this.encodeAudioData(audioData)
-            }
+            "contents": [{
+              "role": "user",
+              "parts": [{
+                "audio_data": base64Audio
+              }]
+            }]
           }));
         }
       });
+      
       await this.recorder.start();
 
     } catch (error) {
@@ -123,12 +172,14 @@ export class RealtimeChat {
   }
 
   private encodeAudioData(float32Array: Float32Array): string {
+    // Convert Float32 to Int16 (required by Gemini)
     const int16Array = new Int16Array(float32Array.length);
     for (let i = 0; i < float32Array.length; i++) {
       const s = Math.max(-1, Math.min(1, float32Array[i]));
       int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     
+    // Convert to base64
     const uint8Array = new Uint8Array(int16Array.buffer);
     let binary = '';
     const chunkSize = 0x8000;
