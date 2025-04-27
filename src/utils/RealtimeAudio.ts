@@ -13,17 +13,14 @@ export class AudioRecorder {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 24000,
-          channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
         }
       });
       
-      this.audioContext = new AudioContext({
-        sampleRate: 24000,
-      });
+      // Create audio context without enforcing a specific sample rate
+      this.audioContext = new AudioContext();
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);

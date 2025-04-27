@@ -44,14 +44,22 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
   };
 
   const endConversation = () => {
-    chatRef.current?.disconnect();
-    setIsConnected(false);
-    onSpeakingChange(false);
+    if (chatRef.current) {
+      chatRef.current.disconnect();
+      chatRef.current = null;
+      setIsConnected(false);
+      onSpeakingChange(false);
+    }
   };
 
+  // Ensure cleanup when component unmounts
   useEffect(() => {
     return () => {
-      chatRef.current?.disconnect();
+      if (chatRef.current) {
+        console.log("Cleaning up voice interface on unmount");
+        chatRef.current.disconnect();
+        chatRef.current = null;
+      }
     };
   }, []);
 
