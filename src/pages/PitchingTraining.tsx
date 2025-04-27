@@ -1,12 +1,12 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { NavigationBar } from "@/components/NavigationBar";
 import { Pose, POSE_CONNECTIONS, Results } from "@mediapipe/pose";
 import { Camera } from "@mediapipe/camera_utils";
+import { UserRoundPen } from "lucide-react";
 
-const PitchingTraining = () => {
+const TrainingPrep = () => {
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState<number>(5);
   const [started, setStarted] = useState(false);
@@ -16,7 +16,10 @@ const PitchingTraining = () => {
   const cameraRef = useRef<Camera | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [waitingForFeedback, setWaitingForFeedback] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
+  // Countdown logic
   useEffect(() => {
     if (started && countdown > 0) {
       const timer = setTimeout(() => {
@@ -29,6 +32,10 @@ const PitchingTraining = () => {
   }, [countdown, started]);
 
   const startCamera = async () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      console.log("Cleared old interval.");
+    }
     if (!videoRef.current) {
       console.error("Video element not found");
       return;
@@ -60,11 +67,12 @@ const PitchingTraining = () => {
 
     try {
       await camera.start();
-      console.log("Camera started for pitching analysis!");
+      console.log("Camera started!");
       setCameraStarted(true);
+      connectWebSocket();
 
       intervalRef.current = setInterval(() => {
-        if (latestLandmarks.current) {
+        if (latestLandmarks.current && !waitingForFeedback) {
           sendLandmarks(latestLandmarks.current);
         }
       }, 1000);
@@ -86,12 +94,15 @@ const PitchingTraining = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
+      // Set canvas size to match video
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
 
+      // Clear previous drawings
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.strokeStyle = "#00FF00";
+      // Draw connections
+      ctx.strokeStyle = "#00FF00"; // bright green for connections
       ctx.lineWidth = 2;
       POSE_CONNECTIONS.forEach(([startIdx, endIdx]) => {
         const start = results.poseLandmarks[startIdx];
@@ -104,7 +115,8 @@ const PitchingTraining = () => {
         }
       });
 
-      ctx.fillStyle = "#FF0000";
+      // Draw points
+      ctx.fillStyle = "#FF0000"; // red for keypoints
       results.poseLandmarks.forEach((landmark) => {
         const x = landmark.x * canvas.width;
         const y = landmark.y * canvas.height;
@@ -115,24 +127,103 @@ const PitchingTraining = () => {
     }
   };
 
-  const sendLandmarks = async (landmarks: Results["poseLandmarks"]) => {
-    try {
-      await fetch("http://localhost:8000/baseball", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ points: landmarks }),
-      });
-    } catch (error) {
-      console.error("Failed to send landmarks:", error);
+  let canSpeak = true;
+
+  const generateSpeech = async (text: string) => {
+    if (!canSpeak) {
+      console.log("Blocked from speaking: waiting 20s cooldown.");
+      return;
     }
+
+    canSpeak = false;
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer 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`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini-tts",
+          voice: "Nova",
+          input: text,
+          speed: 2.50,
+          response_format: "mp3",
+          instructions: "be seductive, flirty and sexy"
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error("TTS API Error:", err);
+        canSpeak = true; // Reset if error
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      const audio = new Audio(url);
+      await audio.play();
+      console.log("Speech played.");
+
+      setTimeout(() => {
+        canSpeak = true;
+        console.log("Ready to speak again.");
+      }, 25000); // <-- unlock after 20 seconds
+    } catch (error) {
+      console.error("Failed to generate speech:", error);
+      canSpeak = true; // Reset if error
+    }
+  };
+  const connectWebSocket = () => {
+    const ws = new WebSocket("ws://localhost:8000/baseball");
+    ws.onopen = () => {
+      console.log("WebSocket connection opened.");
+    };
+    ws.onmessage = (event) => {
+      const rawData = event.data;
+      try {
+        const data = JSON.parse(rawData);
+        console.log("Received from server:", data);
+
+        if (data.Text) {
+          console.log("LLM Feedback:", data.Text);
+          setWaitingForFeedback(true);
+          generateSpeech(data.Text);
+          setWaitingForFeedback(false);
+        } else {
+          console.log("Server message:", data.message);
+        }
+      } catch (e) {
+        console.error("Error parsing server message:", e);
+      }
+    };
+    ws.onclose = () => {
+      console.log("WebSocket closed.");
+    };
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
+
+    wsRef.current = ws;
+  };
+
+  const sendLandmarks = (landmarks: Results["poseLandmarks"]) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket is not open.");
+      return;
+    }
+
+    wsRef.current.send(JSON.stringify({ points: landmarks }));
   };
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (cameraRef.current) cameraRef.current.stop();
+      if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
@@ -140,8 +231,14 @@ const PitchingTraining = () => {
     <>
       <NavigationBar variant="dashboard" />
       <div className="container mx-auto px-4 py-8 pt-20">
-        <h1 className="text-3xl font-bold text-center mb-8">Prepare for Pitching Analysis</h1>
+
+        <Button onClick={() => generateSpeech("Hello! Test audio.")}>
+          Test TTS
+        </Button>
+        <h1 className="text-3xl font-bold text-center mb-8">Prepare for Training</h1>
         <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md relative">
+
+          {/* Always render video, just hide it if not ready */}
           <video
             ref={videoRef}
             className={`absolute top-0 left-0 w-full rounded-lg ${cameraStarted ? '' : 'hidden'}`}
@@ -163,7 +260,7 @@ const PitchingTraining = () => {
                   <li>✓ Find a well-lit area</li>
                   <li>✓ Ensure your whole body is visible</li>
                   <li>✓ Clear the space around you</li>
-                  <li>✓ Have your baseball ready</li>
+                  <li>✓ Have your basketball ready</li>
                 </ul>
               </div>
               <div className="flex justify-center space-x-4">
@@ -174,7 +271,7 @@ const PitchingTraining = () => {
                   Start Countdown
                 </Button>
                 <Button
-                  onClick={() => navigate('/baseball')}
+                  onClick={() => navigate('/basketball')}
                   variant="outline"
                 >
                   Back
@@ -189,7 +286,9 @@ const PitchingTraining = () => {
                   <p className="text-lg">Starting camera session...</p>
                 </>
               ) : (
-                <p className="text-lg">Camera session started! Get ready to pitch!</p>
+                <>
+                  <p className="text-lg">Camera session started! Move around to begin training.</p>
+                </>
               )}
             </div>
           )}
@@ -197,6 +296,5 @@ const PitchingTraining = () => {
       </div>
     </>
   );
-};
-
-export default PitchingTraining;
+}
+export default TrainingPrep;

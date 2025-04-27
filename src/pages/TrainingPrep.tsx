@@ -16,6 +16,8 @@ const TrainingPrep = () => {
   const cameraRef = useRef<Camera | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [waitingForFeedback, setWaitingForFeedback] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Countdown logic
   useEffect(() => {
@@ -30,6 +32,10 @@ const TrainingPrep = () => {
   }, [countdown, started]);
 
   const startCamera = async () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      console.log("Cleared old interval.");
+    }
     if (!videoRef.current) {
       console.error("Video element not found");
       return;
@@ -63,12 +69,13 @@ const TrainingPrep = () => {
       await camera.start();
       console.log("Camera started!");
       setCameraStarted(true);
+      connectWebSocket();
 
       intervalRef.current = setInterval(() => {
-        if (latestLandmarks.current) {
+        if (latestLandmarks.current && !waitingForFeedback) {
           sendLandmarks(latestLandmarks.current);
         }
-      }, 1000);
+      }, 10000);
     } catch (error) {
       console.error("Failed to start camera:", error);
     }
@@ -120,24 +127,78 @@ const TrainingPrep = () => {
     }
   };
 
-  const sendLandmarks = async (landmarks: Results["poseLandmarks"]) => {
+  const generateSpeech = async (text: string) => {
     try {
-      await fetch("http://localhost:8000/bball", {
-        method: "POST",
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Authorization': `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`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ points: landmarks }),
+        body: JSON.stringify({
+          model: "gpt-4o-mini-tts",
+          voice: "coral",
+          input: text,
+          instructions: "Speak in a cheerful and positive tone."
+        }),
       });
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      const audio = new Audio(url);
+      audio.play();
     } catch (error) {
-      console.error("Failed to send landmarks:", error);
+      console.error("Failed to generate speech:", error);
     }
+  };
+  const connectWebSocket = () => {
+    const ws = new WebSocket("ws://localhost:8000/baseball");
+    ws.onopen = () => {
+      console.log("WebSocket connection opened.");
+    };
+    ws.onmessage = (event) => {
+      const rawData = event.data;
+      try {
+        const data = JSON.parse(rawData);
+        console.log("Received from server:", data);
+
+        if (data.Text) {
+          console.log("LLM Feedback:", data.Text);
+          setWaitingForFeedback(true);
+          generateSpeech(data.Text);
+          setWaitingForFeedback(false);
+        } else {
+          console.log("Server message:", data.message);
+        }
+      } catch (e) {
+        console.error("Error parsing server message:", e);
+      }
+    };
+    ws.onclose = () => {
+      console.log("WebSocket closed.");
+    };
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
+
+    wsRef.current = ws;
+  };
+
+  const sendLandmarks = (landmarks: Results["poseLandmarks"]) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket is not open.");
+      return;
+    }
+
+    wsRef.current.send(JSON.stringify({ points: landmarks }));
   };
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (cameraRef.current) cameraRef.current.stop();
+      if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
@@ -145,6 +206,10 @@ const TrainingPrep = () => {
     <>
       <NavigationBar variant="dashboard" />
       <div className="container mx-auto px-4 py-8 pt-20">
+
+        <Button onClick={() => generateSpeech("Hello! Test audio.")}>
+          Test TTS
+        </Button>
         <h1 className="text-3xl font-bold text-center mb-8">Prepare for Training</h1>
         <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md relative">
 
@@ -198,7 +263,6 @@ const TrainingPrep = () => {
               ) : (
                 <>
                   <p className="text-lg">Camera session started! Move around to begin training.</p>
-                  {/* no need to put another <video> here */}
                 </>
               )}
             </div>
