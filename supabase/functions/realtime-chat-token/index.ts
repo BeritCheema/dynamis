@@ -19,45 +19,14 @@ serve(async (req) => {
       throw new Error('GEMENI_API_KEY is not set');
     }
 
-    // Initialize the WebSocket session with Gemini
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-live-001:streamGenerateContent?key=" + GEMENI_API_KEY, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        "contents": [{
-          "role": "user",
-          "parts": [{
-            "text": "Hello"
-          }]
-        }],
-        "generation_config": {
-          "response_modalities": ["AUDIO"],
-          "speech_config": {
-            "voice_config": {
-              "prebuilt_voice_config": {
-                "voice_name": "Puck"
-              }
-            }
-          }
-        },
-        "system_instruction": {
-          "parts": [{
-            "text": "You are a knowledgeable baseball pitching coach. You help players improve their pitching technique, provide advice on different pitches, and answer questions about baseball pitching mechanics. Keep your responses focused, practical, and encouraging. If asked about an injury, always recommend consulting a medical professional."
-          }]
-        }
-      }),
-    });
-
-    const data = await response.json();
-    console.log("Session response:", data);
-
-    // Create a properly formatted response for the client
-    // The WebSocket URL will be constructed client-side using the API key
+    // Use a valid model name for Gemini
+    const modelName = "gemini-1.5-flash-latest";
+    
+    // We don't actually need to make an initial request here,
+    // we just need to provide the API key and model name to the client
     const sessionData = {
-      sessionHandle: GEMENI_API_KEY, // We're using the API key as the session handle
-      modelName: "gemini-2.0-flash-live-001"
+      sessionHandle: GEMENI_API_KEY,
+      modelName: modelName
     };
 
     return new Response(JSON.stringify(sessionData), {

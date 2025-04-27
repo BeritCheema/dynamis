@@ -11,9 +11,10 @@ export class AudioRecorder {
 
   async start() {
     try {
+      // Request user microphone at 16kHz to match Gemini's requirements
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000, // Gemini requires 16kHz for input
+          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -21,9 +22,12 @@ export class AudioRecorder {
         }
       });
       
-      this.audioContext = new AudioContext({
-        sampleRate: 16000, // Match Gemini's required input sample rate
-      });
+      // Create AudioContext with the SAME sample rate as the requested stream
+      this.audioContext = new AudioContext();
+      
+      // Get the actual sample rate from the AudioContext
+      const actualSampleRate = this.audioContext.sampleRate;
+      console.log(`Actual AudioContext sample rate: ${actualSampleRate}Hz`);
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
@@ -66,6 +70,7 @@ export class RealtimeChat {
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
   private apiKey: string | null = null;
+  private isFirstMessage = true;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
@@ -83,7 +88,7 @@ export class RealtimeChat {
       }
 
       this.apiKey = data.sessionHandle;
-      const modelName = data.modelName || "gemini-2.0-flash-live-001";
+      const modelName = data.modelName || "gemini-1.5-flash-latest";
 
       // Create WebSocket connection to Gemini with the API key
       const wsUrl = `wss://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${this.apiKey}`;
@@ -93,24 +98,7 @@ export class RealtimeChat {
       this.ws.onopen = () => {
         console.log("WebSocket connection established");
         // Send initial configuration
-        this.ws.send(JSON.stringify({
-          "contents": [{
-            "role": "user",
-            "parts": [{
-              "text": "Hello, I'm ready to talk about baseball pitching."
-            }]
-          }],
-          "generation_config": {
-            "response_modalities": ["AUDIO"],
-            "speech_config": {
-              "voice_config": {
-                "prebuilt_voice_config": {
-                  "voice_name": "Puck"
-                }
-              }
-            }
-          }
-        }));
+        this.sendInitialConfig();
       };
       
       this.ws.onmessage = (event) => {
@@ -152,14 +140,20 @@ export class RealtimeChat {
           // Convert audio format for Gemini (Float32Array to base64)
           const base64Audio = this.encodeAudioData(audioData);
           
-          this.ws.send(JSON.stringify({
-            "contents": [{
-              "role": "user",
-              "parts": [{
-                "audio_data": base64Audio
+          if (this.isFirstMessage) {
+            // For the first message, we send both the text prompt and audio data
+            this.isFirstMessage = false;
+          } else {
+            // For subsequent messages, we only send the audio data
+            this.ws.send(JSON.stringify({
+              "contents": [{
+                "role": "user",
+                "parts": [{
+                  "audio_data": base64Audio
+                }]
               }]
-            }]
-          }));
+            }));
+          }
         }
       });
       
@@ -169,6 +163,34 @@ export class RealtimeChat {
       console.error("Error initializing chat:", error);
       throw error;
     }
+  }
+  
+  private sendInitialConfig() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    
+    this.ws.send(JSON.stringify({
+      "contents": [{
+        "role": "user",
+        "parts": [{
+          "text": "Hello, I'm ready to talk about baseball pitching."
+        }]
+      }],
+      "generation_config": {
+        "response_modalities": ["AUDIO"],
+        "speech_config": {
+          "voice_config": {
+            "prebuilt_voice_config": {
+              "voice_name": "Puck"
+            }
+          }
+        }
+      },
+      "system_instruction": {
+        "parts": [{
+          "text": "You are a knowledgeable baseball pitching coach. You help players improve their pitching technique, provide advice on different pitches, and answer questions about baseball pitching mechanics. Keep your responses focused, practical, and encouraging. If asked about an injury, always recommend consulting a medical professional."
+        }]
+      }
+    }));
   }
 
   private encodeAudioData(float32Array: Float32Array): string {
