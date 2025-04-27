@@ -4,27 +4,69 @@ import { Button } from "@/components/ui/button";
 import { NavigationBar } from "@/components/NavigationBar";
 import { Pose, POSE_CONNECTIONS, Results } from "@mediapipe/pose";
 import { Camera } from "@mediapipe/camera_utils";
-import { UserRoundPen } from "lucide-react";
 
 const TrainingPrep = () => {
   const navigate = useNavigate();
-  const [countdown, setCountdown] = useState<number>(5);
+
+  const [countdown, setCountdown] = useState(5);
   const [started, setStarted] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [waitingForFeedback, setWaitingForFeedback] = useState(false);
+
+  const [isThrowPeriod, setIsThrowPeriod] = useState(false);
+  const isThrowPeriodRef = useRef(false);
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const periodEndTimeRef = useRef(Date.now() + 5000);
+
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const poseRef = useRef<Pose | null>(null);
   const cameraRef = useRef<Camera | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [waitingForFeedback, setWaitingForFeedback] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const latestLandmarks = useRef<Results["poseLandmarks"] | null>(null);
 
-  // Countdown logic
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const phaseFlipRef = useRef<NodeJS.Timeout | null>(null);
+  const timerUpdateRef = useRef<NodeJS.Timeout | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const THROW_DURATION = 1 * 1000; // milliseconds
+  const REST_DURATION = 5 * 1000;  // milliseconds
+
+  // --- Period Control ---
+  const startPeriodLoop = () => {
+    isThrowPeriodRef.current = false;
+    setIsThrowPeriod(false);
+    periodEndTimeRef.current = Date.now() + REST_DURATION;
+    sendClearToServer();
+
+    phaseFlipRef.current = setInterval(() => {
+      isThrowPeriodRef.current = !isThrowPeriodRef.current;
+      setIsThrowPeriod(isThrowPeriodRef.current);
+
+      if (isThrowPeriodRef.current) {
+        periodEndTimeRef.current = Date.now() + THROW_DURATION;
+        sendAudioToServer();
+      } else {
+        periodEndTimeRef.current = Date.now() + REST_DURATION;
+        sendClearToServer();
+        sendAudioToServer();
+      }
+    }, THROW_DURATION + REST_DURATION);
+
+    timerUpdateRef.current = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 100);
+  };
+
+  const periodCountdown = Math.max(0, Math.ceil((periodEndTimeRef.current - currentTime) / 1000));
+
   useEffect(() => {
     if (started && countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(countdown - 1);
-      }, 1000);
+      const timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
     } else if (started && countdown === 0) {
       startCamera();
@@ -32,10 +74,10 @@ const TrainingPrep = () => {
   }, [countdown, started]);
 
   const startCamera = async () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      console.log("Cleared old interval.");
-    }
+    startPeriodLoop();
+
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
     if (!videoRef.current) {
       console.error("Video element not found");
       return;
@@ -72,20 +114,62 @@ const TrainingPrep = () => {
       connectWebSocket();
 
       intervalRef.current = setInterval(() => {
-        if (latestLandmarks.current && !waitingForFeedback) {
+        if (latestLandmarks.current && !waitingForFeedback && isThrowPeriodRef.current) {
           sendLandmarks(latestLandmarks.current);
         }
-      }, 1000);
+      }, 100);
     } catch (error) {
       console.error("Failed to start camera:", error);
     }
 
     poseRef.current = pose;
     cameraRef.current = camera;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+
+          // Keep only roughly last 15 seconds of audio chunks
+          const maxChunks = Math.ceil(15000 / 1000); // assuming ~1 chunk per second
+          if (audioChunksRef.current.length > maxChunks) {
+            audioChunksRef.current.shift();
+          }
+        }
+      };
+
+      mediaRecorder.start(1000); // capture every 1 second
+      mediaRecorderRef.current = mediaRecorder;
+      console.log("Microphone recording started.");
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+    }
   };
 
-  const latestLandmarks = useRef<Results["poseLandmarks"] | null>(null);
+  const sendAudioToServer = async () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket not open for audio send.");
+      return;
+    }
+    if (audioChunksRef.current.length === 0) {
+      console.log("No audio to send.");
+      return;
+    }
 
+    const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Audio = (reader.result as string).split(',')[1];
+      wsRef.current?.send(JSON.stringify({
+        type: "audio",
+        data: base64Audio,
+      }));
+      console.log("Sent audio data to server.");
+    };
+    reader.readAsDataURL(audioBlob);
+  };
   const onResults = (results: Results) => {
     if (results.poseLandmarks && canvasRef.current && videoRef.current) {
       latestLandmarks.current = results.poseLandmarks;
@@ -94,15 +178,11 @@ const TrainingPrep = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Set canvas size to match video
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
-
-      // Clear previous drawings
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw connections
-      ctx.strokeStyle = "#00FF00"; // bright green for connections
+      ctx.strokeStyle = "#00FF00";
       ctx.lineWidth = 2;
       POSE_CONNECTIONS.forEach(([startIdx, endIdx]) => {
         const start = results.poseLandmarks[startIdx];
@@ -115,8 +195,7 @@ const TrainingPrep = () => {
         }
       });
 
-      // Draw points
-      ctx.fillStyle = "#FF0000"; // red for keypoints
+      ctx.fillStyle = "#FF0000";
       results.poseLandmarks.forEach((landmark) => {
         const x = landmark.x * canvas.width;
         const y = landmark.y * canvas.height;
@@ -126,17 +205,7 @@ const TrainingPrep = () => {
       });
     }
   };
-
-  let canSpeak = true;
-
   const generateSpeech = async (text: string) => {
-    if (!canSpeak) {
-      console.log("Blocked from speaking: waiting 20s cooldown.");
-      return;
-    }
-
-    canSpeak = false;
-
     try {
       const response = await fetch('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
@@ -146,18 +215,17 @@ const TrainingPrep = () => {
         },
         body: JSON.stringify({
           model: "gpt-4o-mini-tts",
-          voice: "Nova",
+          voice: "nova",
           input: text,
-          speed: 2.50,
+          speed: 2.0,
           response_format: "mp3",
-          instructions: "be seductive, flirty and sexy"
+          instructions: "Be seductive, flirty and sexy."
         }),
       });
 
       if (!response.ok) {
         const err = await response.text();
         console.error("TTS API Error:", err);
-        canSpeak = true; // Reset if error
         return;
       }
 
@@ -166,47 +234,33 @@ const TrainingPrep = () => {
 
       const audio = new Audio(url);
       await audio.play();
-      console.log("Speech played.");
 
-      setTimeout(() => {
-        canSpeak = true;
-        console.log("Ready to speak again.");
-      }, 25000); // <-- unlock after 20 seconds
+      console.log("Speech played. Waiting 20 seconds...");
+
+      await new Promise((resolve) => setTimeout(resolve, 20000)); // <-- 20 second wait after playing
+      console.log("Ready for next speech.");
     } catch (error) {
       console.error("Failed to generate speech:", error);
-      canSpeak = true; // Reset if error
     }
   };
   const connectWebSocket = () => {
     const ws = new WebSocket("ws://localhost:8000/baseball");
-    ws.onopen = () => {
-      console.log("WebSocket connection opened.");
-    };
+    ws.onopen = () => console.log("WebSocket connection opened.");
     ws.onmessage = (event) => {
-      const rawData = event.data;
       try {
-        const data = JSON.parse(rawData);
+        const data = JSON.parse(event.data);
         console.log("Received from server:", data);
-
         if (data.Text) {
-          console.log("LLM Feedback:", data.Text);
           setWaitingForFeedback(true);
-          generateSpeech(data.Text);
+          generateSpeech(data.Text); // Uncomment if needed
           setWaitingForFeedback(false);
-        } else {
-          console.log("Server message:", data.message);
         }
       } catch (e) {
         console.error("Error parsing server message:", e);
       }
     };
-    ws.onclose = () => {
-      console.log("WebSocket closed.");
-    };
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-
+    ws.onclose = () => console.log("WebSocket closed.");
+    ws.onerror = (err) => console.error("WebSocket error:", err);
     wsRef.current = ws;
   };
 
@@ -215,13 +269,24 @@ const TrainingPrep = () => {
       console.error("WebSocket is not open.");
       return;
     }
-
     wsRef.current.send(JSON.stringify({ points: landmarks }));
+    console.log('sent');
+  };
+
+  const sendClearToServer = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket not open for clear.");
+      return;
+    }
+    wsRef.current.send(JSON.stringify({ type: "clear" }));
+    console.log("Sent CLEAR");
   };
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (phaseFlipRef.current) clearInterval(phaseFlipRef.current);
+      if (timerUpdateRef.current) clearInterval(timerUpdateRef.current);
       if (cameraRef.current) cameraRef.current.stop();
       if (wsRef.current) wsRef.current.close();
     };
@@ -231,17 +296,21 @@ const TrainingPrep = () => {
     <>
       <NavigationBar variant="dashboard" />
       <div className="container mx-auto px-4 py-8 pt-20">
-
-        <Button onClick={() => generateSpeech("Hello! Test audio.")}>
-          Test TTS
-        </Button>
         <h1 className="text-3xl font-bold text-center mb-8">Prepare for Training</h1>
-        <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md relative">
 
-          {/* Always render video, just hide it if not ready */}
+        {cameraStarted && (
+          <div className="text-center mb-6">
+            <h2 className={`text-2xl font-bold ${isThrowPeriod ? "text-green-500" : "text-blue-500"}`}>
+              {isThrowPeriod ? "🚀 THROW PERIOD!" : "😌 REST PERIOD"}
+            </h2>
+            <p className="text-lg mt-2">Next phase in {periodCountdown} seconds</p>
+          </div>
+        )}
+
+        <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md relative">
           <video
             ref={videoRef}
-            className={`absolute top-0 left-0 w-full rounded-lg ${cameraStarted ? '' : 'hidden'}`}
+            className={`absolute top-0 left-0 w-full rounded-lg ${cameraStarted ? "" : "hidden"}`}
             autoPlay
             muted
             playsInline
@@ -253,27 +322,19 @@ const TrainingPrep = () => {
           />
 
           {!started && !cameraStarted ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-xl font-semibold mb-4">Before We Begin</h2>
-                <ul className="text-left space-y-3 mb-6">
-                  <li>✓ Find a well-lit area</li>
-                  <li>✓ Ensure your whole body is visible</li>
-                  <li>✓ Clear the space around you</li>
-                  <li>✓ Have your basketball ready</li>
-                </ul>
-              </div>
+            <div className="space-y-6 text-center">
+              <h2 className="text-xl font-semibold mb-4">Before We Begin</h2>
+              <ul className="text-left space-y-3 mb-6">
+                <li>✓ Find a well-lit area</li>
+                <li>✓ Ensure your whole body is visible</li>
+                <li>✓ Clear the space around you</li>
+                <li>✓ Have your basketball ready</li>
+              </ul>
               <div className="flex justify-center space-x-4">
-                <Button
-                  onClick={() => setStarted(true)}
-                  className="bg-orange-500 hover:bg-orange-600"
-                >
+                <Button onClick={() => setStarted(true)} className="bg-orange-500 hover:bg-orange-600">
                   Start Countdown
                 </Button>
-                <Button
-                  onClick={() => navigate('/basketball')}
-                  variant="outline"
-                >
+                <Button onClick={() => navigate("/basketball")} variant="outline">
                   Back
                 </Button>
               </div>
@@ -286,9 +347,7 @@ const TrainingPrep = () => {
                   <p className="text-lg">Starting camera session...</p>
                 </>
               ) : (
-                <>
-                  <p className="text-lg">Camera session started! Move around to begin training.</p>
-                </>
+                <p className="text-lg">Camera session started! Move around to begin training.</p>
               )}
             </div>
           )}
@@ -296,5 +355,6 @@ const TrainingPrep = () => {
       </div>
     </>
   );
-}
+};
+
 export default TrainingPrep;
