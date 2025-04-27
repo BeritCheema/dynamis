@@ -30,7 +30,7 @@ const Index = () => {
           </div>
 
           <h1 className="text-5xl font-bold mb-4 text-gray-900 animate-fade-in relative z-10">
-            Motion Coach
+            Dynamis
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl text-center px-4 animate-fade-in animation-delay-200">
             Train smarter. Move better. Get real-time feedback on your form.
