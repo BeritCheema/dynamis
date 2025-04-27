@@ -207,10 +207,12 @@ const TrainingPrep = () => {
   };
   const generateSpeech = async (text: string) => {
     try {
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+
       const response = await fetch('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer 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`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -236,8 +238,7 @@ const TrainingPrep = () => {
       await audio.play();
 
       console.log("Speech played. Waiting 20 seconds...");
-
-      await new Promise((resolve) => setTimeout(resolve, 20000)); // <-- 20 second wait after playing
+      await new Promise((resolve) => setTimeout(resolve, 20000));
       console.log("Ready for next speech.");
     } catch (error) {
       console.error("Failed to generate speech:", error);
