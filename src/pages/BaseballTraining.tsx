@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Dumbbell, MessageSquare, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import VoiceInterface from "@/components/VoiceInterface";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const BaseballTraining = () => {
   const navigate = useNavigate();
   const [showVoiceInterface, setShowVoiceInterface] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleStartTraining = () => {
     navigate('/pitching');
@@ -19,12 +17,6 @@ const BaseballTraining = () => {
 
   const handleTalkToCoach = () => {
     setShowVoiceInterface(true);
-  };
-
-  const handleClose = () => {
-    setShowVoiceInterface(false);
-    setIsDialogOpen(false);
-    setIsSpeaking(false);
   };
 
   return (
@@ -76,50 +68,26 @@ const BaseballTraining = () => {
             </CardContent>
           </Card>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Card
-                className="cursor-pointer hover:shadow-lg transition-shadow hover:scale-105"
+          <Card
+            className={`cursor-pointer hover:shadow-lg transition-shadow hover:scale-105 ${showVoiceInterface ? 'border-primary' : ''}`}
+            onClick={handleTalkToCoach}
+          >
+            <CardHeader className="flex flex-row items-center gap-4">
+              <MessageSquare className={`w-8 h-8 ${isSpeaking ? 'text-primary animate-pulse' : 'text-orange-500'}`} />
+              <CardTitle>Talk to Coach</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600">
+                Have questions about your pitching technique? Want personalized advice?
+                Chat with our AI coach to get customized baseball pitching tips.
+              </p>
+              <Button 
+                className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
               >
-                <CardHeader className="flex flex-row items-center gap-4">
-                  <MessageSquare className={`w-8 h-8 ${isSpeaking ? 'text-primary animate-pulse' : 'text-orange-500'}`} />
-                  <CardTitle>Talk to Coach</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">
-                    Have questions about your pitching technique? Want personalized advice?
-                    Chat with our AI coach to get customized baseball pitching tips.
-                  </p>
-                  <Button 
-                    className="mt-4 bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
-                  >
-                    Start Chat
-                  </Button>
-                </CardContent>
-              </Card>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Chat with Baseball Coach</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col items-center gap-4 py-4">
-                {showVoiceInterface && (
-                  <VoiceInterface 
-                    onSpeakingChange={setIsSpeaking} 
-                    onClose={handleClose} 
-                  />
-                )}
-                {!showVoiceInterface && (
-                  <Button 
-                    onClick={handleTalkToCoach}
-                    className="bg-primary hover:bg-primary/90 text-white"
-                  >
-                    Start Conversation
-                  </Button>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+                {showVoiceInterface ? 'Chatting with Coach' : 'Start Chat'}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         <Button 
@@ -129,6 +97,10 @@ const BaseballTraining = () => {
         >
           Back to Dashboard
         </Button>
+
+        {showVoiceInterface && (
+          <VoiceInterface onSpeakingChange={setIsSpeaking} />
+        )}
       </div>
     </>
   );
