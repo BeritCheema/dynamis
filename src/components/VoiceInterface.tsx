@@ -6,9 +6,10 @@ import { RealtimeChat } from '@/utils/RealtimeAudio';
 
 interface VoiceInterfaceProps {
   onSpeakingChange: (speaking: boolean) => void;
+  onClose?: () => void;
 }
 
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => {
+const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange, onClose }) => {
   const { toast } = useToast();
   const [isConnected, setIsConnected] = useState(false);
   const chatRef = useRef<RealtimeChat | null>(null);
@@ -47,6 +48,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
     chatRef.current?.disconnect();
     setIsConnected(false);
     onSpeakingChange(false);
+    if (onClose) {
+      onClose();
+    }
   };
 
   useEffect(() => {
@@ -56,21 +60,27 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
   }, []);
 
   return (
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-4 w-full">
       {!isConnected ? (
         <Button 
           onClick={startConversation}
-          className="bg-primary hover:bg-primary/90 text-white"
+          className="bg-primary hover:bg-primary/90 text-white w-full"
         >
           Start Conversation
         </Button>
       ) : (
-        <Button 
-          onClick={endConversation}
-          variant="secondary"
-        >
-          End Conversation
-        </Button>
+        <div className="flex flex-col gap-4 w-full">
+          <p className="text-center text-sm text-muted-foreground">
+            Conversation active. Speak to interact with the coach.
+          </p>
+          <Button 
+            onClick={endConversation}
+            variant="destructive"
+            className="w-full"
+          >
+            End Conversation
+          </Button>
+        </div>
       )}
     </div>
   );
