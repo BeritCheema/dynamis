@@ -21,6 +21,12 @@ const BaseballTraining = () => {
     setShowVoiceInterface(true);
   };
 
+  const handleClose = () => {
+    setShowVoiceInterface(false);
+    setIsDialogOpen(false);
+    setIsSpeaking(false);
+  };
+
   return (
     <>
       <NavigationBar variant="dashboard" />
@@ -100,10 +106,7 @@ const BaseballTraining = () => {
                 {showVoiceInterface && (
                   <VoiceInterface 
                     onSpeakingChange={setIsSpeaking} 
-                    onClose={() => {
-                      setShowVoiceInterface(false);
-                      setIsDialogOpen(false);
-                    }} 
+                    onClose={handleClose} 
                   />
                 )}
                 {!showVoiceInterface && (
